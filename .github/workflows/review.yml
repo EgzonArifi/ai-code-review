@@ -21,6 +21,11 @@ on:
         required: false
         type: string
         default: "v1"
+      max_turns:
+        description: "Max agent turns for the reviewer. Raise for large or multi-stack (monorepo) PRs."
+        required: false
+        type: number
+        default: 60
     secrets:
       ANTHROPIC_API_KEY:
         required: true
@@ -34,7 +39,7 @@ permissions:
 jobs:
   review:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     # One review per PR at a time; cancel superseded runs.
     concurrency:
       group: ai-review-${{ github.event.pull_request.number || github.event.issue.number }}
@@ -77,6 +82,10 @@ jobs:
       #    size-gated pipeline; rules are read from disk.
       - name: Run AI review
         uses: anthropics/claude-code-action@v1
+        # The reviewer is advisory and must never fail a PR's checks. A turn-cap
+        # hit or transient API error is best-effort — the run still records what
+        # happened (and the eval-log step below runs regardless).
+        continue-on-error: true
         env:
           # Where the reviewer writes its evaluation log (kept + dropped findings).
           AI_REVIEW_LOG: ${{ runner.temp }}/ai-review-log.md
@@ -134,7 +143,7 @@ jobs:
               suppressed; it must never be posted to the PR.
           claude_args: |
             --model ${{ inputs.model }}
-            --max-turns 20
+            --max-turns ${{ inputs.max_turns }}
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Task,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr comment:*),Bash(git blame:*),Bash(git log:*),Bash(echo:*),Read,Grep,Glob,Write"
 
       # Publish the reviewer's evaluation log to the run's Summary page (rendered
