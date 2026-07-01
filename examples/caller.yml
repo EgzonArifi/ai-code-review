@@ -1,0 +1,32 @@
+# Copy this file into a consumer repo at `.github/workflows/ai-review.yml`.
+#
+# Requirements in the consumer repo:
+#   - An `ANTHROPIC_API_KEY` Actions secret (repo-level or org-level). It is the only secret.
+#
+# Set `stack:` to your project's stack. For a monorepo, pass a comma-separated
+# list (e.g. `stack: backend,frontend`).
+#
+# This is the whole integration — all review logic lives in the central engine.
+
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, ready_for_review]
+  issue_comment:
+    types: [created]
+
+jobs:
+  ai-review:
+    # Run automatically on PR open/ready, or manually when someone comments
+    # "@ai-review" on a pull request (guard against plain issues).
+    if: |
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request != null &&
+       contains(github.event.comment.body, '@ai-review'))
+    uses: EgzonArifi/ai-code-review/.github/workflows/review.yml@v1
+    with:
+      stack: ios
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
