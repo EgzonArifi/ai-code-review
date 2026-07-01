@@ -102,6 +102,9 @@ of style feedback.
 
 - **Inline comments:** one per unique finding, on the exact `file:line`, prefixed with its
   severity marker. Include a brief why and, when small and self-contained, a suggested fix.
-- **Summary comment:** open with a one-line tally, e.g. `1 important, 2 nits`. Lead with
+  Use the inline-comment tool **only** for actual findings — never for the summary.
+- **Summary:** always post exactly one **top-level PR comment** (via `gh pr comment`), never as
+  an inline comment on a line. Open with a one-line tally, e.g. `1 important, 2 nits`. Lead with
   **"No blocking issues"** when there are none. Optionally note how many low-confidence or nit
-  findings were suppressed, as a count.
+  findings were suppressed, as a count. When there are zero findings, this top-level comment is
+  the entire output — do not attach it to a file/line.
