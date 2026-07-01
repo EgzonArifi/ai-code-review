@@ -40,9 +40,10 @@ Get the current SHA with `gh api repos/EgzonArifi/ai-code-review/commits/main --
 
 ## Evals
 
-Rule changes are graded for signal-vs-noise by an offline harness before shipping — see
-[`evals/`](evals/). It runs the real rule packs over a labeled corpus of diffs and scores the
-findings (precision / recall / false-positives) with an LLM judge, gated in CI on `rules/**`.
+Rule changes are checked for noise with a **reference-free audit over real PRs** — see
+[`evals/`](evals/). It runs the real rule packs over actual pull-request diffs (pulled via `gh`)
+and a skeptical LLM judge scores each finding, reporting a **noise rate** — no hand-written labels.
+It's a local tuning tool (`node evals/audit.mjs --repo owner/name --last 5 --stack ios`).
 
 ## Status
 

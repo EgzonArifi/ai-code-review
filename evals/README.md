@@ -1,58 +1,37 @@
-# Evals — grading for the reviewer
+# Evals — reference-free audit of the reviewer
 
-Two complementary tools measure the reviewer's **signal vs. noise** so `rules/*.md` can be tuned
-with evidence instead of vibes:
+Measures the reviewer's **noise / precision** on **real pull requests**, with no hand-written
+labels. It runs the actual rule packs over real PR diffs and a skeptical LLM judge scores each
+finding on its own merits, reporting a **noise rate**. This is the property we care about — "is
+the reviewer chatty/wrong on real diffs?" — measured cheaply and representatively.
 
-- **`audit.mjs` — reference-free audit over REAL PRs (primary).** No labels to write. It runs the
-  rules over real pull-request diffs and a skeptical judge scores each finding on its own merits,
-  reporting a **noise rate**. This is the low-effort, representative way to measure precision/noise
-  — the property we actually care about. It cannot measure recall (unknown misses).
-- **`run.mjs` — tiny labeled regression set (secondary).** A *small* set of hand-labeled cases
-  that guard against regressing critical findings (recall) and known noise traps. Keep it small —
-  don't try to grow it into a big corpus; that's what the audit is for.
-
-Both share `lib.mjs` (the rule-loading + review call), so they exercise the same rules.
+- `audit.mjs` — the tool.
+- `lib.mjs` — shared rule-loading + review call (also reusable if a labeled harness is ever
+  re-added).
 
 ## How it works
 
-For each case under `cases/<name>/`:
+For each PR:
 
-1. `run.mjs` loads `rules/general.md` + the case's stack pack, applies them to `input.diff`
-   via one Anthropic API call, and gets structured findings back.
-2. An LLM judge maps those findings against the gold labels in `expected.json` and reports
-   **matched (TP) / missed (FN) / false-positives (FP) / extra (unlabeled)**.
-3. Aggregate **precision / recall / false-positives** are printed; the process exits non-zero if
-   they fall below the thresholds in `run.mjs` (`precision ≥ 0.9`, `recall ≥ 0.9`, `FP = 0`).
+1. `audit.mjs` fetches the diff via `gh`, applies `rules/general.md` + the stack pack, and gets
+   structured findings.
+2. A skeptical judge scores each finding 0–10 on **valid** (technically correct given the code)
+   and **relevant** (worth a comment — low if trivial, subjective, speculative, or a linter's
+   job), defaulting low when uncertain.
+3. Findings clearing both thresholds are `✓ kept`; the rest are `✗ NOISE`. Aggregate **noise
+   rate** and average scores are printed.
 
-> Scope: this exercises the **rules** via a single model call. It does not replicate the GitHub
-> Action's full runtime (subagent fan-out, git-blame). It's a rules-tuning signal, not a
-> full-system integration test.
+## Scope & limitations (read this)
 
-## Case format
-
-Cases are grouped per stack, with a `general/` bucket for cross-stack cases:
-
-```
-cases/
-  <stack>/<case>/        # e.g. ios/retain-cycle/
-    input.diff           # a unified diff
-    expected.json        # { stack, description, should_flag[], should_not_flag[] }
-  general/<case>/        # cross-stack cases (always run), e.g. trivial-doc-change
-```
-
-Cases are discovered by walking `cases/` for any directory holding an `expected.json`, so the
-nesting is flexible — the `stack` field inside `expected.json` is authoritative.
-
-- `should_flag` — issues the reviewer **must** report (true positives). Each has an `id`,
-  `severity`, and a `hint` the judge uses to match semantically.
-- `should_not_flag` — **noise traps**: things that must NOT be flagged (e.g. style deferred to
-  SwiftLint, trivial changes). A finding matching a trap counts as a false positive.
-- A finding that is neither expected nor a trap is reported as **extra** — a possibly-legit
-  finding we didn't label. It's surfaced for manual review but not counted against precision.
+- **Precision, not recall.** The audit only sees what the reviewer *did* post, so it measures
+  noise/false-positives — not *misses* (unknown recall). If recall guarding matters later, add a
+  small labeled harness back (`lib.mjs` still exports `reviewDiff`).
+- **LLM-judge.** The judge is itself a model scoring a model. Treat the noise rate as
+  *directional*, and spot-check the `✗ NOISE` reasons.
+- **Rules, not the full runtime.** Like the deployed reviewer it uses the same `rules/*.md`, but
+  via a single API call — no subagent fan-out or git-blame. It's a rules-tuning signal.
 
 ## Running
-
-**Reference-free audit over real PRs (primary):**
 
 ```bash
 # Last 5 merged PRs of a repo:
@@ -61,40 +40,15 @@ ANTHROPIC_API_KEY=sk-ant-... node evals/audit.mjs --repo waybacklabs/CrossedPath
 ANTHROPIC_API_KEY=sk-ant-... node evals/audit.mjs --repo waybacklabs/CrossedPaths 81 98 --stack ios
 ```
 
-Needs the `gh` CLI authenticated with read access to the target repo. Each finding costs one extra
-judge call; huge diffs are truncated (`MAX_DIFF_CHARS`). Findings marked `✗ NOISE` are the ones to
-tune `general.md` against — or to capture as a regression case.
+Requires Node 18+ and the `gh` CLI authenticated with read access to the target repo. Options:
+`--repo owner/name` (required), `--stack ios` (default `ios`), `--last N` or explicit PR numbers,
+`EVAL_MODEL` (default `claude-sonnet-4-6`). Huge diffs are truncated (`MAX_DIFF_CHARS`).
 
-**Labeled regression set (secondary):**
+> Not run in CI: auditing a private consumer repo needs read access to *that* repo, which the
+> engine repo's CI doesn't have. Run it locally against the repos you're tuning for.
 
-```bash
-ANTHROPIC_API_KEY=sk-ant-... node evals/run.mjs           # all cases
-ANTHROPIC_API_KEY=sk-ant-... node evals/run.mjs ios       # only ios/ + general/ cases
-# optional: EVAL_MODEL=claude-sonnet-4-6 ; EVAL_STACK=ios (same as the positional arg)
-```
+## Using it to tune
 
-The stack filter runs cases whose `stack` matches, plus everything under `general/`.
-
-Requires Node 18+ (uses global `fetch`; no dependencies). Each case makes 2 API calls (review +
-judge), so a run costs real tokens.
-
-## CI
-
-`.github/workflows/evals.yml` runs the harness on PRs that touch `rules/**` or `evals/**`,
-using an `ANTHROPIC_API_KEY` secret on this repo. That way every change to the rules is graded
-before it ships.
-
-## Growing the corpus
-
-The corpus is the "live dog." When a real PR surfaces a false positive or a miss, add it as a
-new case (a minimal diff + labels) so regressions are caught.
-
-**Prioritize noise cases from real PRs.** Planted-bug cases (like the seeds here) are useful
-regression guards, but the reviewer's hardest job — and the original motivation — is *staying
-quiet on messy, realistic diffs that warrant few or no comments*. A corpus made only of obvious
-planted bugs can score perfectly while the reviewer still over-comments in the wild. So weight
-the corpus toward realistic diffs derived from actual PRs (especially ones where the reviewer
-was wrong or chatty), not just synthetic fixtures.
-
-Seeded from cases we validated live: a Combine retain cycle, a multi-issue sync service
-(`ios/places-sync`), and a trivial doc change that must stay silent.
+Run the audit, look at the `✗ NOISE` findings and their reasons, adjust `rules/general.md` or the
+stack pack, and re-run to confirm the noise rate drops. Later, the passive 👍/👎 signal on real
+posted comments is the ground-truth complement to this.
