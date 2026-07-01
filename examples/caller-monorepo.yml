@@ -1,0 +1,30 @@
+# Monorepo caller: copy into the monorepo at `.github/workflows/ai-review.yml`.
+#
+# Pass multiple stacks comma-separated. The reviewer loads BOTH rule packs and
+# applies each to its own paths (backend.md → apps/be, frontend.md → apps/fe /
+# admin / packages/ui). Requires an `ANTHROPIC_API_KEY` Actions secret.
+
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, ready_for_review]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  ai-review:
+    if: |
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request != null &&
+       contains(github.event.comment.body, '@ai-review'))
+    uses: EgzonArifi/ai-code-review/.github/workflows/review.yml@v1
+    with:
+      stack: backend,frontend
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

@@ -14,9 +14,11 @@ Anthropic ships a hosted [Code Review](https://code.claude.com/docs/en/code-revi
 
 - `.github/workflows/review.yml` — reusable workflow (`on: workflow_call`) that checks out the PR, loads the rule packs, and runs the reviewer.
 - `rules/` — the durable asset:
-  - `general.md` — cross-stack philosophy + noise control (severity tiers, a 0–100 confidence gate, verification pass, skip logic).
-  - `ios.md`, and later `android.md` / `react-native.md` / `backend.md` / `frontend.md` — per-stack packs, added one at a time.
-- `examples/caller.yml` — the copy-paste snippet consumers add to opt in.
+  - `general.md` — cross-stack philosophy + noise control (severity tiers, a 0–100 confidence gate, refutation gate, skip logic).
+  - `ios.md`, `backend.md` (NestJS + Prisma), `frontend.md` (React + Vite + TanStack) — per-stack packs, added one at a time; `android.md` / `react-native.md` next.
+- `examples/caller.yml` (single stack) and `examples/caller-monorepo.yml` (`stack: backend,frontend`) — copy-paste snippets consumers add to opt in.
+
+For a monorepo, pass multiple stacks comma-separated (`stack: backend,frontend`); the reviewer loads every listed pack and applies each to its own paths.
 
 The reviewer scales scrutiny to PR size: trivial PRs get a single fast pass; substantial PRs fan out into dimension subagents (bugs / rules-compliance / git-history), then a confidence gate (≥80) and verification pass filter the findings before they are posted as inline comments.
 
