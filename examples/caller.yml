@@ -16,6 +16,14 @@ on:
   issue_comment:
     types: [created]
 
+# Declared here too: a reusable workflow can only REDUCE the caller's token
+# permissions, never elevate them. Without this, a repo whose default token is
+# read-only would silently strip the engine's write access and inline comments
+# would fail to post.
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   ai-review:
     # Run automatically on PR open/ready, or manually when someone comments

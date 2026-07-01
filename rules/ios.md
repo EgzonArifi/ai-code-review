@@ -59,8 +59,6 @@ Do not review or comment on files matching:
 **/Packages/OpenAPIClient/**
 **/Packages/Lingua/**
 **/PovioMacro/**
-**/AtlasUI/**
-**/Onboarding/**
 **/.build/**
 fastlane/
 Scripts/
