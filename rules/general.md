@@ -24,7 +24,7 @@ picks them up via `rules_ref`.
 
 ---
 
-## Scoring model: tiers + a confidence gate + verification
+## Scoring model: tiers + a confidence gate + a refutation gate
 
 **Severity tiers** describe *how bad* a finding is (presentation only):
 
@@ -42,10 +42,19 @@ control:
 - **Drop anything below `CONFIDENCE_THRESHOLD`.** Nits must additionally clear
   `NIT_CONFIDENCE_THRESHOLD`.
 - Governing rule: **"If you are not certain an issue is real, do not flag it."**
+- **Show the confidence on every posted finding**, e.g. `🔴 [conf 92]`.
 
-**Verification pass** (run before posting): re-check each surviving finding independently against
-the code. A behavior claim must cite a concrete `file:line`, not an inference. If it does not
-reproduce, drop it.
+**Refutation gate** (run before posting — the core noise control): after producing candidate
+findings, switch to a *skeptical reviewer* stance and, for EACH candidate, actively try to
+**refute** it before it earns a post:
+
+- Point to the exact `file:line` that proves the problem is real. No concrete citation → drop.
+- Ask: "could this be intentional, handled elsewhere, or already covered by CI / a linter?"
+  If plausibly yes → drop.
+- Assign the confidence score *after* this refutation attempt, not before.
+- **Post only findings you could not refute** and that clear the threshold. When in doubt, drop.
+
+This adversarial self-critique — not the fan-out — is what actually controls noise.
 
 ---
 
@@ -59,8 +68,8 @@ reproduce, drop it.
    - Substantial PRs (≥ `SUBSTANTIAL_DIFF_LINES`) → fan out into parallel dimension agents:
      (a) **bugs/correctness** on the diff, (b) **rules-compliance** (this file + stack pack +
      `REVIEW.md`), (c) **git-history/blame** to classify introduced vs pre-existing.
-3. **Merge → confidence gate → verification pass → dedupe.**
-4. **Report** inline comments + one summary.
+3. **Merge → refutation gate (try to refute each; keep only survivors ≥ threshold) → dedupe.**
+4. **Report** inline comments + one summary, and emit the evaluation log (see Output).
 
 The fan-out only improves recall on large PRs. The confidence gate and verification pass are
 what control noise on *every* PR.
@@ -101,10 +110,21 @@ of style feedback.
 ## Output
 
 - **Inline comments:** one per unique finding, on the exact `file:line`, prefixed with its
-  severity marker. Include a brief why and, when small and self-contained, a suggested fix.
-  Use the inline-comment tool **only** for actual findings — never for the summary.
+  severity marker and confidence (e.g. `🔴 [conf 92]`). Include a brief why and, when small and
+  self-contained, a suggested fix. Use the inline-comment tool **only** for actual findings —
+  never for the summary.
 - **Summary:** always post exactly one **top-level PR comment** (via `gh pr comment`), never as
   an inline comment on a line. Open with a one-line tally, e.g. `1 important, 2 nits`. Lead with
   **"No blocking issues"** when there are none. Optionally note how many low-confidence or nit
   findings were suppressed, as a count. When there are zero findings, this top-level comment is
   the entire output — do not attach it to a file/line.
+- **Evaluation log (workflow-only observability, NOT a PR comment):** as the final action, write
+  a markdown record of the run to the file path given by the `AI_REVIEW_LOG` environment variable
+  (using the `Write` tool). Include **every candidate — kept AND dropped** — as a table:
+
+  | file:line | severity | conf | verdict | reason |
+  |---|---|---|---|---|
+
+  `verdict` is `posted` or `dropped`; for dropped ones, `reason` states why the refutation gate or
+  a threshold rejected it. This is how a human reads what the reviewer suppressed and why — it
+  never appears on the PR. If `AI_REVIEW_LOG` is unset, skip this step.
