@@ -118,13 +118,14 @@ of style feedback.
   **"No blocking issues"** when there are none. Optionally note how many low-confidence or nit
   findings were suppressed, as a count. When there are zero findings, this top-level comment is
   the entire output — do not attach it to a file/line.
-- **Evaluation log (workflow-only observability, NOT a PR comment):** as the final action, write
-  a markdown record of the run to the file path given by the `AI_REVIEW_LOG` environment variable
-  (using the `Write` tool). Include **every candidate — kept AND dropped** — as a table:
+- **Evaluation log (REQUIRED; workflow-only observability, NOT a PR comment):** as the final
+  action, always use the `Write` tool to write a file named `.ai-review-log.md` in the repository
+  root (the current working directory). Include **every candidate — kept AND dropped** — as a
+  table:
 
   | file:line | severity | conf | verdict | reason |
   |---|---|---|---|---|
 
   `verdict` is `posted` or `dropped`; for dropped ones, `reason` states why the refutation gate or
-  a threshold rejected it. This is how a human reads what the reviewer suppressed and why — it
-  never appears on the PR. If `AI_REVIEW_LOG` is unset, skip this step.
+  a threshold rejected it. Write it even when there are zero candidates ("No candidates."). This is
+  how a human reads what the reviewer suppressed and why — it never appears on the PR.

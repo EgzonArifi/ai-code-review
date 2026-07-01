@@ -86,9 +86,6 @@ jobs:
         # hit or transient API error is best-effort — the run still records what
         # happened (and the eval-log step below runs regardless).
         continue-on-error: true
-        env:
-          # Where the reviewer writes its evaluation log (kept + dropped findings).
-          AI_REVIEW_LOG: ${{ runner.temp }}/ai-review-log.md
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ github.token }}
@@ -134,13 +131,16 @@ jobs:
             - Post ONE top-level summary comment with a one-line tally (e.g. "1 important, 2 nits").
               Lead with "No blocking issues" when there are none.
 
-            STEP 5 — Evaluation log (workflow observability, NOT a PR comment):
-            - Determine the log path: run `echo "$AI_REVIEW_LOG"`. If it is empty, skip this step.
-            - Otherwise use the Write tool to write a markdown table of EVERY candidate — both
-              posted AND dropped — to that path, with columns: file:line | severity | conf |
-              verdict (posted/dropped) | reason. For dropped candidates, the reason must state why
-              the refutation gate or a threshold rejected it. This is how a human sees what was
-              suppressed; it must never be posted to the PR.
+            STEP 5 — Evaluation log (REQUIRED; workflow observability, NOT a PR comment):
+            - Using the Write tool, ALWAYS write a file named `.ai-review-log.md` in the repository
+              root (your current working directory). This is a required deliverable — do it even if
+              there are zero candidates (then write "No candidates.").
+            - Content: a markdown table of EVERY candidate you considered — both posted AND
+              dropped — with columns: `file:line | severity | conf | verdict | reason`. `verdict`
+              is `posted` or `dropped`; for dropped candidates the reason must state why the
+              refutation gate or a threshold rejected it.
+            - This file is read by the workflow and shown on the run Summary; it must NEVER be
+              posted to the PR.
           claude_args: |
             --model ${{ inputs.model }}
             --max-turns ${{ inputs.max_turns }}
@@ -151,7 +151,7 @@ jobs:
       - name: Publish evaluation log
         if: always()
         run: |
-          LOG="${{ runner.temp }}/ai-review-log.md"
+          LOG="${{ github.workspace }}/.ai-review-log.md"
           echo "===== AI REVIEW EVALUATION LOG (begin) ====="
           if [ -f "$LOG" ]; then
             cat "$LOG"
