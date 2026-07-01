@@ -143,7 +143,9 @@ jobs:
         if: always()
         run: |
           LOG="${{ runner.temp }}/ai-review-log.md"
+          echo "===== AI REVIEW EVALUATION LOG (begin) ====="
           if [ -f "$LOG" ]; then
+            cat "$LOG"
             {
               echo "## 🔎 AI review — evaluation log"
               echo
@@ -152,6 +154,10 @@ jobs:
               cat "$LOG"
             } >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "## 🔎 AI review — evaluation log" >> "$GITHUB_STEP_SUMMARY"
-            echo "_No evaluation log was produced for this run._" >> "$GITHUB_STEP_SUMMARY"
+            echo "No evaluation log was produced for this run."
+            {
+              echo "## 🔎 AI review — evaluation log"
+              echo "_No evaluation log was produced for this run._"
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
+          echo "===== AI REVIEW EVALUATION LOG (end) ====="
