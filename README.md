@@ -28,6 +28,16 @@ This repo is intentionally **public**. Consumers span multiple GitHub orgs, and 
 
 Add a caller workflow (see [`examples/caller.yml`](examples/caller.yml)) to your repo and set an `ANTHROPIC_API_KEY` secret. That's the only required secret.
 
+### Pinning (`@v1` vs a commit SHA)
+
+The example pins to `@v1`, a **rolling major-version tag** that moves forward as the engine is tuned — consumers pick up improvements automatically. The tradeoff: `@v1` is a floating ref, and your `ANTHROPIC_API_KEY` is passed to whatever that ref currently points at. For a stricter supply-chain posture, pin to an immutable commit SHA instead:
+
+```yaml
+uses: EgzonArifi/ai-code-review/.github/workflows/review.yml@<full-commit-sha>
+```
+
+Get the current SHA with `gh api repos/EgzonArifi/ai-code-review/commits/main --jq '.sha'`, and re-pin when you intentionally want upstream changes. (This surface shrinks further once the engine moves to an org repo with branch protection.)
+
 ## Status
 
 Early / engine-first. Build order: engine skeleton → iOS pack → tag `v1` → additional platform packs incrementally.
