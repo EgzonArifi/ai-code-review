@@ -38,6 +38,12 @@ uses: EgzonArifi/ai-code-review/.github/workflows/review.yml@<full-commit-sha>
 
 Get the current SHA with `gh api repos/EgzonArifi/ai-code-review/commits/main --jq '.sha'`, and re-pin when you intentionally want upstream changes. (This surface shrinks further once the engine moves to an org repo with branch protection.)
 
+## Evals
+
+Rule changes are graded for signal-vs-noise by an offline harness before shipping — see
+[`evals/`](evals/). It runs the real rule packs over a labeled corpus of diffs and scores the
+findings (precision / recall / false-positives) with an LLM judge, gated in CI on `rules/**`.
+
 ## Status
 
 Early / engine-first. Build order: engine skeleton → iOS pack → tag `v1` → additional platform packs incrementally.

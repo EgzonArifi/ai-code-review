@@ -1,0 +1,22 @@
+diff --git a/src/CrossedPaths/SmokeTestController.swift b/src/CrossedPaths/SmokeTestController.swift
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/CrossedPaths/SmokeTestController.swift
+@@ -0,0 +1,18 @@
++import Foundation
++import Combine
++
++final class SmokeTestController {
++    private var cancellables = Set<AnyCancellable>()
++    private let subject = PassthroughSubject<Int, Never>()
++    private var total = 0
++
++    func start() {
++        subject
++            .sink { value in
++                self.total += value
++            }
++            .store(in: &cancellables)
++    }
++}

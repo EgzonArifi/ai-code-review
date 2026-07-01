@@ -1,0 +1,27 @@
+name: Evals
+
+# Grades the reviewer against the labeled corpus whenever the rules or the
+# harness change, so tuning is measured before it ships. Needs an
+# ANTHROPIC_API_KEY secret on this repo.
+
+on:
+  pull_request:
+    paths:
+      - "rules/**"
+      - "evals/**"
+      - ".github/workflows/evals.yml"
+  workflow_dispatch:
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run evals
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: node evals/run.mjs

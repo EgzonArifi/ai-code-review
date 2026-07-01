@@ -1,0 +1,17 @@
+{
+  "stack": "ios",
+  "description": "A Combine sink captures self strongly and is stored on self.cancellables, forming a retain cycle. Must be flagged. No style/lint nits.",
+  "should_flag": [
+    {
+      "id": "retain-cycle",
+      "severity": "important",
+      "hint": "The sink closure captures `self` strongly and the AnyCancellable is stored on self.cancellables -> reference cycle; SmokeTestController never deallocates. Fix: [weak self]."
+    }
+  ],
+  "should_not_flag": [
+    {
+      "id": "style-nits",
+      "hint": "Do not raise SwiftLint-style nits (formatting, naming, line length, modifier order) — those are deferred to SwiftLint."
+    }
+  ]
+}
