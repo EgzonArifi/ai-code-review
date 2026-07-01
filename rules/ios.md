@@ -13,8 +13,11 @@ cannot already catch.** Everything the toolchain enforces is noise if you repeat
 CI runs `swiftlint --strict` with force-unwrapping and length/complexity rules enabled. Never
 post findings for:
 
-- Force unwraps (`!`), `try!`, force casts (`as!`) — `force_unwrapping` is enforced.
-- Line length, function/type/file length, cyclomatic complexity.
+- Force unwraps (`!`), `try!`, force casts (`as!`) — all enforced (SwiftLint default
+  `force_try` / `force_cast` plus opt-in `force_unwrapping`).
+- Line length, function / type / file length, parameter count. (Note: `cyclomatic_complexity`
+  is **disabled** in this template — don't treat it as linter-covered, and don't flag it either;
+  subjective complexity isn't worth a comment per general.md.)
 - `print(...)` in place of a logger, trailing whitespace, modifier order, comment spacing.
 - Singleton style, `guard`-vs-`if` return style, one-enum-case-per-line, and other custom
   SwiftLint rules.
@@ -23,9 +26,13 @@ If SwiftLint would catch it, stay silent.
 
 ## Defer to the project's architecture skills — mention, don't re-derive
 
-Architecture conventions live in the repo's `.agents/skills/` (`povio-arch`, `atlas`,
-`swift-concurrency`, `swiftui-*`). If a genuine violation is worth raising, keep it to a brief
-🟡 pointer to the relevant convention — do not restate the whole rule. Typical cases:
+Architecture conventions live in the repo's `.agents/skills/`: `povio-arch` (MVVM + Router +
+Interactor + Mapper, DI, packages), `atlas` (AtlasUI design system / tokens), `swift-concurrency`
+(async/await, actors, `@MainActor`, `Sendable`, retain cycles), `swiftui-performance-audit` (view
+recomputation / hangs), `swiftui-ui-patterns` (NavigationStack, sheets, lists, etc.), and
+`swiftui-view-refactor` (Observation, `@State`/`@Observable`). If a genuine violation is worth
+raising, keep it to a brief 🟡 pointer to the relevant skill — do not restate the whole rule.
+Typical cases:
 
 - View containing business logic, or navigation performed outside the Router.
 - ViewModel missing `@Observable` / `@MainActor`, or injected instead of owned via `@State`.
@@ -45,6 +52,9 @@ These are the high-value 🔴 findings for iOS:
   `Task.detached` losing actor context).
 - **Logic & error handling:** incorrect business logic, swallowed errors, unhandled failure
   paths, off-by-one / boundary bugs, incorrect optional handling that changes behavior.
+- **State-machine consistency on error paths:** loading/`isLoading`/pagination flags left in a
+  wrong state when an `async` call throws mid-flight, cursors not reset, a `catch` that swallows
+  a failure without surfacing or recovering (common in ViewModel `load`/`loadMore` paths).
 - **API integration:** Mapper DTO → Domain correctness — especially handling of the OpenAPI
   generator's `unknownDefaultOpenApi` / unknown enum cases; Interactor logic that mishandles
   API results, pagination, or auth/token state.
@@ -65,8 +75,10 @@ Scripts/
 BuildScripts/
 FileTemplates/
 **/*Tests/**
+vendor/
 *.generated.*
 Package.resolved
+Packages/*/Package.swift
 ```
 
 (A repo's `REVIEW.md` may add to or narrow this list.)
