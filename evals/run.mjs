@@ -18,70 +18,15 @@
 // Env:    EVAL_MODEL (default claude-sonnet-4-6)
 
 import { readFile, readdir } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { anthropic, extractJson, reviewDiff, API_KEY, REPO_ROOT } from './lib.mjs';
 
-const ROOT = dirname(fileURLToPath(import.meta.url));
-const REPO = join(ROOT, '..');
-const MODEL = process.env.EVAL_MODEL || 'claude-sonnet-4-6';
-const API_KEY = process.env.ANTHROPIC_API_KEY;
+const ROOT = join(REPO_ROOT, 'evals');
 const THRESHOLDS = { precision: 0.9, recall: 0.9, maxFalsePositives: 0 };
 
 if (!API_KEY) {
   console.error('ANTHROPIC_API_KEY is not set.');
   process.exit(2);
-}
-
-async function anthropic(system, user, maxTokens = 3000) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': API_KEY,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: maxTokens,
-      system,
-      messages: [{ role: 'user', content: user }],
-    }),
-  });
-  if (!res.ok) throw new Error(`Anthropic API ${res.status}: ${await res.text()}`);
-  const data = await res.json();
-  return (data.content || []).map((c) => c.text || '').join('');
-}
-
-function extractJson(text) {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const raw = fenced ? fenced[1] : text;
-  const start = raw.search(/[[{]/);
-  if (start < 0) throw new Error(`No JSON found in model output:\n${text}`);
-  return JSON.parse(raw.slice(start));
-}
-
-async function loadRules(stack) {
-  let rules = await readFile(join(REPO, 'rules', 'general.md'), 'utf8');
-  for (const s of stack.split(',').map((x) => x.trim()).filter(Boolean)) {
-    try {
-      rules += `\n\n# rules/${s}.md\n` + (await readFile(join(REPO, 'rules', `${s}.md`), 'utf8'));
-    } catch {
-      /* stack pack may not exist yet */
-    }
-  }
-  return rules;
-}
-
-async function reviewCase(meta, diff) {
-  const rules = await loadRules(meta.stack);
-  const system =
-    `You are an automated pull-request reviewer. Follow these rules EXACTLY:\n\n${rules}\n\n` +
-    `Apply the confidence gate, verification, proportionality, and all suppression rules.\n` +
-    `Output ONLY a JSON object of the form:\n` +
-    `{"findings":[{"file":string,"line":number,"severity":"important"|"nit"|"pre-existing","confidence":number,"title":string,"body":string}],"summary":string}\n` +
-    `If nothing clears the bar, return an empty findings array.`;
-  const user = `Review this diff for a "${meta.stack}" project.\n\nDIFF:\n${diff}`;
-  return extractJson(await anthropic(system, user, 3000));
 }
 
 async function grade(meta, diff, result) {
@@ -143,7 +88,7 @@ for (const dir of caseDirs) {
 
   let result, g;
   try {
-    result = await reviewCase(meta, diff);
+    result = await reviewDiff(meta.stack, diff);
     g = await grade(meta, diff, result);
   } catch (err) {
     console.log(`\n## ${name}\n  ERROR: ${err.message}`);

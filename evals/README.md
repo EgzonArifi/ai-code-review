@@ -1,8 +1,17 @@
-# Evals — offline grading for the reviewer
+# Evals — grading for the reviewer
 
-A small harness that measures the reviewer's **signal vs. noise** so `rules/*.md` can be tuned
-with evidence instead of vibes. It runs the real rule packs over a set of labeled cases and
-grades the findings with an LLM judge.
+Two complementary tools measure the reviewer's **signal vs. noise** so `rules/*.md` can be tuned
+with evidence instead of vibes:
+
+- **`audit.mjs` — reference-free audit over REAL PRs (primary).** No labels to write. It runs the
+  rules over real pull-request diffs and a skeptical judge scores each finding on its own merits,
+  reporting a **noise rate**. This is the low-effort, representative way to measure precision/noise
+  — the property we actually care about. It cannot measure recall (unknown misses).
+- **`run.mjs` — tiny labeled regression set (secondary).** A *small* set of hand-labeled cases
+  that guard against regressing critical findings (recall) and known noise traps. Keep it small —
+  don't try to grow it into a big corpus; that's what the audit is for.
+
+Both share `lib.mjs` (the rule-loading + review call), so they exercise the same rules.
 
 ## How it works
 
@@ -42,6 +51,21 @@ nesting is flexible — the `stack` field inside `expected.json` is authoritativ
   finding we didn't label. It's surfaced for manual review but not counted against precision.
 
 ## Running
+
+**Reference-free audit over real PRs (primary):**
+
+```bash
+# Last 5 merged PRs of a repo:
+ANTHROPIC_API_KEY=sk-ant-... node evals/audit.mjs --repo waybacklabs/CrossedPaths --last 5 --stack ios
+# Specific PRs:
+ANTHROPIC_API_KEY=sk-ant-... node evals/audit.mjs --repo waybacklabs/CrossedPaths 81 98 --stack ios
+```
+
+Needs the `gh` CLI authenticated with read access to the target repo. Each finding costs one extra
+judge call; huge diffs are truncated (`MAX_DIFF_CHARS`). Findings marked `✗ NOISE` are the ones to
+tune `general.md` against — or to capture as a regression case.
+
+**Labeled regression set (secondary):**
 
 ```bash
 ANTHROPIC_API_KEY=sk-ant-... node evals/run.mjs           # all cases
