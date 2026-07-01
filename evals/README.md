@@ -21,11 +21,18 @@ For each case under `cases/<name>/`:
 
 ## Case format
 
+Cases are grouped per stack, with a `general/` bucket for cross-stack cases:
+
 ```
-cases/<name>/
-  input.diff        # a unified diff
-  expected.json     # { stack, description, should_flag[], should_not_flag[] }
+cases/
+  <stack>/<case>/        # e.g. ios/retain-cycle/
+    input.diff           # a unified diff
+    expected.json        # { stack, description, should_flag[], should_not_flag[] }
+  general/<case>/        # cross-stack cases (always run), e.g. trivial-doc-change
 ```
+
+Cases are discovered by walking `cases/` for any directory holding an `expected.json`, so the
+nesting is flexible — the `stack` field inside `expected.json` is authoritative.
 
 - `should_flag` — issues the reviewer **must** report (true positives). Each has an `id`,
   `severity`, and a `hint` the judge uses to match semantically.
@@ -37,9 +44,12 @@ cases/<name>/
 ## Running
 
 ```bash
-ANTHROPIC_API_KEY=sk-ant-... node evals/run.mjs
-# optional: EVAL_MODEL=claude-sonnet-4-6
+ANTHROPIC_API_KEY=sk-ant-... node evals/run.mjs           # all cases
+ANTHROPIC_API_KEY=sk-ant-... node evals/run.mjs ios       # only ios/ + general/ cases
+# optional: EVAL_MODEL=claude-sonnet-4-6 ; EVAL_STACK=ios (same as the positional arg)
 ```
+
+The stack filter runs cases whose `stack` matches, plus everything under `general/`.
 
 Requires Node 18+ (uses global `fetch`; no dependencies). Each case makes 2 API calls (review +
 judge), so a run costs real tokens.
@@ -53,5 +63,14 @@ before it ships.
 ## Growing the corpus
 
 The corpus is the "live dog." When a real PR surfaces a false positive or a miss, add it as a
-new case (a minimal diff + labels) so regressions are caught. Seeded from the first two cases we
-validated live: a Combine retain cycle (must flag) and a trivial doc change (must stay silent).
+new case (a minimal diff + labels) so regressions are caught.
+
+**Prioritize noise cases from real PRs.** Planted-bug cases (like the seeds here) are useful
+regression guards, but the reviewer's hardest job — and the original motivation — is *staying
+quiet on messy, realistic diffs that warrant few or no comments*. A corpus made only of obvious
+planted bugs can score perfectly while the reviewer still over-comments in the wild. So weight
+the corpus toward realistic diffs derived from actual PRs (especially ones where the reviewer
+was wrong or chatty), not just synthetic fixtures.
+
+Seeded from cases we validated live: a Combine retain cycle, a multi-issue sync service
+(`ios/places-sync`), and a trivial doc change that must stay silent.

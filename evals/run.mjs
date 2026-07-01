@@ -107,16 +107,37 @@ async function grade(meta, diff, result) {
   return extractJson(await anthropic(system, user, 2000));
 }
 
+// Discover cases: any directory (at any depth) under cases/ holding an expected.json.
+// Structure is cases/<stack>/<case>/, plus a general/ bucket for cross-stack cases.
 const casesDir = join(ROOT, 'cases');
-const dirs = (await readdir(casesDir, { withFileTypes: true })).filter((d) => d.isDirectory());
-if (!dirs.length) {
-  console.error('No cases found under evals/cases/');
+const entries = await readdir(casesDir, { recursive: true, withFileTypes: true });
+let caseDirs = entries
+  .filter((e) => e.isFile() && e.name === 'expected.json')
+  .map((e) => e.parentPath || e.path)
+  .sort();
+
+// Optional stack filter: `node evals/run.mjs ios` or EVAL_STACK=ios.
+// A case runs if it has no stack, its stack matches, or it lives under general/.
+const stackFilter = (process.env.EVAL_STACK || process.argv[2] || '').trim();
+if (stackFilter) {
+  const filtered = [];
+  for (const dir of caseDirs) {
+    const meta = JSON.parse(await readFile(join(dir, 'expected.json'), 'utf8'));
+    const stacks = (meta.stack || '').split(',').map((s) => s.trim());
+    if (stacks.includes(stackFilter) || dir.includes(`${'/'}general${'/'}`)) filtered.push(dir);
+  }
+  caseDirs = filtered;
+  console.log(`(filtered to stack "${stackFilter}": ${caseDirs.length} case(s))`);
+}
+
+if (!caseDirs.length) {
+  console.error('No cases found under evals/cases/' + (stackFilter ? ` for stack "${stackFilter}"` : ''));
   process.exit(2);
 }
 
 const agg = { tp: 0, fn: 0, fp: 0, extra: 0 };
-for (const d of dirs) {
-  const dir = join(casesDir, d.name);
+for (const dir of caseDirs) {
+  const name = dir.slice(casesDir.length + 1);
   const meta = JSON.parse(await readFile(join(dir, 'expected.json'), 'utf8'));
   const diff = await readFile(join(dir, 'input.diff'), 'utf8');
 
@@ -125,7 +146,7 @@ for (const d of dirs) {
     result = await reviewCase(meta, diff);
     g = await grade(meta, diff, result);
   } catch (err) {
-    console.log(`\n## ${d.name}\n  ERROR: ${err.message}`);
+    console.log(`\n## ${name}\n  ERROR: ${err.message}`);
     process.exitCode = 2;
     continue;
   }
@@ -136,7 +157,7 @@ for (const d of dirs) {
   const extra = (g.extra || []).length;
   agg.tp += tp; agg.fn += fn; agg.fp += fp; agg.extra += extra;
 
-  console.log(`\n## ${d.name}`);
+  console.log(`\n## ${name}`);
   console.log(`  posted=${(result.findings || []).length} matched=${tp} missed=${fn} false_positives=${fp} extra=${extra}`);
   if (fn) console.log('  MISSED: ' + g.missed.join(', '));
   if (fp) console.log('  FALSE POSITIVES: ' + g.false_positives.map((f) => f.title).join('; '));
