@@ -122,14 +122,14 @@ jobs:
             - Pre-flight: if the PR is closed/draft or the diff is trivial, do minimal-to-no work
               per general.md (at most a one-line confirmation). Do not manufacture findings.
             - Size gate: trivial/small PRs → a single pass covering all dimensions.
-              Substantial PRs → spawn parallel dimension subagents via the Task tool:
+              Substantial PRs → spawn parallel dimension sub-agents via the Agent (a.k.a. Task) tool:
               (a) bugs/correctness on the diff, (b) rules-compliance (general + stack + REVIEW.md),
               (c) git-history/blame (use `git blame`/`git log`) to classify introduced vs pre-existing.
             - Independent judge gate (the core noise control — candidates MUST be judged by a
               DIFFERENT agent than the one that found them, to avoid self-bias):
               * Reduce each candidate to a NEUTRAL claim — file:line + what is allegedly wrong —
                 with the finder's justification and proposed severity removed.
-              * Spawn ONE batched judge sub-agent via the Task tool, giving it ONLY the diff, the
+              * Spawn ONE batched judge sub-agent via the Agent (a.k.a. Task) tool, giving it ONLY the diff, the
                 neutral claim list, and Read/Grep/Glob to inspect code — it must NOT see the
                 finder's reasoning. Instruct it to verify each claim (cite the exact file:line that
                 proves it; consider intentional / handled-elsewhere / linter's-job), assign a 0–100
@@ -162,7 +162,7 @@ jobs:
             --model ${{ inputs.model }}
             --max-turns ${{ inputs.max_turns }}
             ${{ inputs.debug && '--debug' || '' }}
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Task,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr comment:*),Bash(git blame:*),Bash(git log:*),Bash(echo:*),Read,Grep,Glob,Write"
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Task,Agent,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr comment:*),Bash(git blame:*),Bash(git log:*),Bash(echo:*),Read,Grep,Glob,Write"
 
       # Publish the reviewer's evaluation log to the run's Summary page (rendered
       # markdown, workflow-only — never touches the PR). Shows dropped findings too.
