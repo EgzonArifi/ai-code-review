@@ -135,9 +135,10 @@ jobs:
               the JUDGE's confidence (e.g. "🔴 [conf 92]") per general.md.
             - Post ONE top-level summary comment (via `gh pr comment`) using the EXACT structured
               verdict template in general.md's Output section: **Merge confidence** (🟢/🟡/🔴 + a
-              one-line rationale per the rubric), **Findings** tally (+ dropped count), and
-              **Open questions** / **Notes** sections ONLY when non-empty. Never post the summary
-              inline.
+              one-line rationale per the rubric), **Must fix before merge** (the 🔴 blockers; only
+              if any), **Findings** tally (+ dropped count), **Risk areas touched** (sensitive
+              surfaces the PR changes — show even with zero findings; only if any), and
+              **Open questions** / **Notes** ONLY when non-empty. Never post the summary inline.
 
             STEP 5 — Evaluation log (REQUIRED; workflow observability, NOT a PR comment):
             - Using the Write tool, ALWAYS write a file named `.ai-review-log.md` in the repository

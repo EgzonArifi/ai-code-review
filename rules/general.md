@@ -126,7 +126,13 @@ of style feedback.
 
   **Merge confidence:** <🟢 High | 🟡 Medium | 🔴 Low> — <one-line rationale>
 
+  **Must fix before merge:**     ← include ONLY if there are 🔴 Important findings
+  - `file:line` — <the blocker, one line>
+
   **Findings:** <X important, Y nits>[ · N dropped (see run Summary)]
+
+  **Risk areas touched:**        ← include ONLY if the PR changes a sensitive surface
+  - <auth/authz | DB migration | billing | data deletion | concurrency | public API/contract | secrets/config> — <where>
 
   **Open questions:**            ← include ONLY if there are any
   - <a genuine, correctness-relevant ambiguity you could not resolve from the code>
@@ -140,6 +146,15 @@ of style feedback.
     self-contained.
   - 🟡 **Medium** — no 🔴, but 🟡 nits and/or open questions worth a human glance.
   - 🔴 **Low** — one or more 🔴 Important findings; address before merge.
+
+  **Must fix before merge** lists exactly the 🔴 Important findings — one line each, with
+  `file:line` — so the blockers are visible in one place. It must agree with the 🔴 inline comments.
+  Omit the section when there are none (i.e. whenever confidence is not 🔴 Low).
+
+  **Risk areas touched** names only genuinely sensitive surfaces the PR modifies — auth/authorization,
+  DB migrations, billing/payments, data deletion, concurrency, public API/contract, secrets/config.
+  **Show it even when there are no findings** — it tells a human reviewer where to look. Keep each
+  line to the surface + location; don't lecture. Omit the section when the PR touches none.
 
   **Open questions** are capped at 3 and must be real correctness-relevant ambiguities (not style,
   not "consider adding a test"). If there are none, omit the section — never pad it.
