@@ -12,15 +12,20 @@ Anthropic ships a hosted [Code Review](https://code.claude.com/docs/en/code-revi
 
 ## How it works
 
-- `.github/workflows/review.yml` — reusable workflow (`on: workflow_call`) that checks out the PR, loads the rule packs, and runs the reviewer.
-- `rules/` — the durable asset:
-  - `general.md` — cross-stack philosophy + noise control (severity tiers, a 0–100 confidence gate, refutation gate, skip logic).
+- `.github/workflows/review.yml` — reusable workflow (`on: workflow_call`) that checks out the PR, loads the rule packs, and runs the reviewer via `claude-code-action`.
+- `rules/` — the durable, tunable asset:
+  - `general.md` — cross-stack philosophy + noise control (severity tiers, a 0–100 confidence gate, an **independent judge**, skip logic, the structured verdict).
   - `ios.md`, `android.md` (Kotlin + Compose), `backend.md` (NestJS + Prisma), `frontend.md` (React + Vite + TanStack) — per-stack packs, added one at a time; `react-native.md` next.
 - `examples/caller.yml` (single stack) and `examples/caller-monorepo.yml` (`stack: backend,frontend`) — copy-paste snippets consumers add to opt in.
 
-For a monorepo, pass multiple stacks comma-separated (`stack: backend,frontend`); the reviewer loads every listed pack and applies each to its own paths.
+The reviewer scales scrutiny to PR size (trivial PRs get a single quick pass; substantial ones fan out into dimension sub-agents). Findings are then handed to a **separate, independent judge sub-agent** — it never sees the finder's reasoning — which assigns each a 0–100 confidence; only judge-confirmed findings post. Output is inline comments plus one **structured verdict** (merge confidence, must-fix blockers, findings tally, risk areas, open questions) and a workflow-only **evaluation log** of everything considered, kept and dropped.
 
-The reviewer scales scrutiny to PR size: trivial PRs get a single fast pass; substantial PRs fan out into dimension subagents (bugs / rules-compliance / git-history), then a confidence gate (≥80) and verification pass filter the findings before they are posted as inline comments.
+## Documentation
+
+- [docs/architecture.md](docs/architecture.md) — the full pipeline, the independent judge, output, distribution.
+- [docs/configuration.md](docs/configuration.md) — inputs, secret, permissions, triggers, pinning, monorepo, and verifying the judge.
+- [docs/authoring-rule-packs.md](docs/authoring-rule-packs.md) — how the rules layer works and how to add/tune a stack pack.
+- [evals/README.md](evals/README.md) — the reference-free audit for measuring noise before shipping rule changes.
 
 ## Visibility
 
@@ -28,25 +33,8 @@ This repo is intentionally **public**. Consumers span multiple GitHub orgs, and 
 
 ## Consuming it
 
-Add a caller workflow (see [`examples/caller.yml`](examples/caller.yml)) to your repo and set an `ANTHROPIC_API_KEY` secret. That's the only required secret.
-
-### Pinning (`@v1` vs a commit SHA)
-
-The example pins to `@v1`, a **rolling major-version tag** that moves forward as the engine is tuned — consumers pick up improvements automatically. The tradeoff: `@v1` is a floating ref, and your `ANTHROPIC_API_KEY` is passed to whatever that ref currently points at. For a stricter supply-chain posture, pin to an immutable commit SHA instead:
-
-```yaml
-uses: EgzonArifi/ai-code-review/.github/workflows/review.yml@<full-commit-sha>
-```
-
-Get the current SHA with `gh api repos/EgzonArifi/ai-code-review/commits/main --jq '.sha'`, and re-pin when you intentionally want upstream changes. (This surface shrinks further once the engine moves to an org repo with branch protection.)
-
-## Evals
-
-Rule changes are checked for noise with a **reference-free audit over real PRs** — see
-[`evals/`](evals/). It runs the real rule packs over actual pull-request diffs (pulled via `gh`)
-and a skeptical LLM judge scores each finding, reporting a **noise rate** — no hand-written labels.
-It's a local tuning tool (`node evals/audit.mjs --repo owner/name --last 5 --stack ios`).
+Add a caller workflow (see [`examples/caller.yml`](examples/caller.yml)) to your repo and set an `ANTHROPIC_API_KEY` secret — the only required secret. For a monorepo, pass multiple stacks (`stack: backend,frontend`). Pin to `@v1` (rolling, auto-updates) or an immutable SHA for a stricter supply-chain posture. Full details — inputs, permissions, triggers, pinning — in [docs/configuration.md](docs/configuration.md).
 
 ## Status
 
-Early / engine-first. Build order: engine skeleton → iOS pack → tag `v1` → additional platform packs incrementally.
+Engine + iOS / Android / backend / frontend packs, independent judge, structured verdict, and the reference-free eval audit are in place and validated. `react-native.md` is the next stack pack.
