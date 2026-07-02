@@ -26,6 +26,11 @@ on:
         required: false
         type: number
         default: 60
+      debug:
+        description: "Append --debug so the run log shows the model's tool calls (e.g. the independent judge's Task invocation). Verbose — use to verify behavior, not on every run."
+        required: false
+        type: boolean
+        default: false
     secrets:
       ANTHROPIC_API_KEY:
         required: true
@@ -153,6 +158,7 @@ jobs:
           claude_args: |
             --model ${{ inputs.model }}
             --max-turns ${{ inputs.max_turns }}
+            ${{ inputs.debug && '--debug' || '' }}
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Task,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr comment:*),Bash(git blame:*),Bash(git log:*),Bash(echo:*),Read,Grep,Glob,Write"
 
       # Publish the reviewer's evaluation log to the run's Summary page (rendered
