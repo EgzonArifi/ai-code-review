@@ -94,6 +94,9 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ github.token }}
+          # When debug is on, print the model's full turn output (incl. Task tool
+          # calls) to the job log so the independent judge sub-agent is verifiable.
+          show_full_output: ${{ inputs.debug }}
           prompt: |
             You are an automated pull-request reviewer. Your #1 objective is HIGH SIGNAL, LOW NOISE.
 
