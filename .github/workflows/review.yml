@@ -117,19 +117,27 @@ jobs:
               Substantial PRs → spawn parallel dimension subagents via the Task tool:
               (a) bugs/correctness on the diff, (b) rules-compliance (general + stack + REVIEW.md),
               (c) git-history/blame (use `git blame`/`git log`) to classify introduced vs pre-existing.
-            - Refutation gate (the core noise control): for EACH candidate, switch to a skeptical
-              stance and try to REFUTE it — point to the exact file:line that proves it, ask whether
-              it could be intentional / handled elsewhere / already covered by CI or a linter, and
-              drop it unless it survives. Assign the 0–100 confidence AFTER this attempt.
-            - Keep only findings you could not refute that clear the threshold and nit cap in
-              general.md; dedupe.
+            - Independent judge gate (the core noise control — candidates MUST be judged by a
+              DIFFERENT agent than the one that found them, to avoid self-bias):
+              * Reduce each candidate to a NEUTRAL claim — file:line + what is allegedly wrong —
+                with the finder's justification and proposed severity removed.
+              * Spawn ONE batched judge sub-agent via the Task tool, giving it ONLY the diff, the
+                neutral claim list, and Read/Grep/Glob to inspect code — it must NOT see the
+                finder's reasoning. Instruct it to verify each claim (cite the exact file:line that
+                proves it; consider intentional / handled-elsewhere / linter's-job), assign a 0–100
+                confidence, and return keep|drop + reason per claim; default to drop when uncertain.
+              * Keep only claims the judge confirms at/above the threshold and nit cap in
+                general.md; dedupe. The judge's confidence is authoritative (shown + logged).
 
             STEP 4 — Report:
             - Post surviving findings as INLINE comments with
               `mcp__github_inline_comment__create_inline_comment`, each tagged with its severity and
-              confidence (e.g. "🔴 [conf 92]") per general.md.
-            - Post ONE top-level summary comment with a one-line tally (e.g. "1 important, 2 nits").
-              Lead with "No blocking issues" when there are none.
+              the JUDGE's confidence (e.g. "🔴 [conf 92]") per general.md.
+            - Post ONE top-level summary comment (via `gh pr comment`) using the EXACT structured
+              verdict template in general.md's Output section: **Merge confidence** (🟢/🟡/🔴 + a
+              one-line rationale per the rubric), **Findings** tally (+ dropped count), and
+              **Open questions** / **Notes** sections ONLY when non-empty. Never post the summary
+              inline.
 
             STEP 5 — Evaluation log (REQUIRED; workflow observability, NOT a PR comment):
             - Using the Write tool, ALWAYS write a file named `.ai-review-log.md` in the repository
@@ -138,7 +146,7 @@ jobs:
             - Content: a markdown table of EVERY candidate you considered — both posted AND
               dropped — with columns: `file:line | severity | conf | verdict | reason`. `verdict`
               is `posted` or `dropped`; for dropped candidates the reason must state why the
-              refutation gate or a threshold rejected it.
+              judge or a threshold rejected it.
             - This file is read by the workflow and shown on the run Summary; it must NEVER be
               posted to the PR.
           claude_args: |

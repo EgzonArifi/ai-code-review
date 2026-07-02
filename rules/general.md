@@ -24,7 +24,7 @@ picks them up via `rules_ref`.
 
 ---
 
-## Scoring model: tiers + a confidence gate + a refutation gate
+## Scoring model: tiers + a confidence gate + an independent judge
 
 **Severity tiers** describe *how bad* a finding is (presentation only):
 
@@ -44,17 +44,21 @@ control:
 - Governing rule: **"If you are not certain an issue is real, do not flag it."**
 - **Show the confidence on every posted finding**, e.g. `🔴 [conf 92]`.
 
-**Refutation gate** (run before posting — the core noise control): after producing candidate
-findings, switch to a *skeptical reviewer* stance and, for EACH candidate, actively try to
-**refute** it before it earns a post:
+**Independent judge gate** (run before posting — the core noise control): the agent that *found*
+the candidates must NOT be the one that decides whether to post them — self-judging is biased
+toward keeping its own work. Hand the candidates to a **separate, independent judge**:
 
-- Point to the exact `file:line` that proves the problem is real. No concrete citation → drop.
-- Ask: "could this be intentional, handled elsewhere, or already covered by CI / a linter?"
-  If plausibly yes → drop.
-- Assign the confidence score *after* this refutation attempt, not before.
-- **Post only findings you could not refute** and that clear the threshold. When in doubt, drop.
+- Reduce each candidate to a **neutral claim** — `file:line` + what is allegedly wrong — with the
+  finder's justification and proposed severity **removed**.
+- Run one **batched judge**: a fresh sub-agent that has *not* seen the finder's reasoning, given
+  the diff, the full claim list, and the ability to read the code. For each claim it must point to
+  the exact `file:line` that proves the problem is real (no concrete citation → drop), ask "could
+  this be intentional, handled elsewhere, or already covered by CI / a linter?" (plausibly yes →
+  drop), and assign the **0–100 confidence**. It defaults to **drop when uncertain**.
+- **Post only claims the judge confirms** at or above the threshold. The **judge's** confidence —
+  not the finder's — is what appears on the finding and in the eval log.
 
-This adversarial self-critique — not the fan-out — is what actually controls noise.
+This independence — not the fan-out — is what actually controls noise.
 
 ---
 
@@ -68,8 +72,8 @@ This adversarial self-critique — not the fan-out — is what actually controls
    - Substantial PRs (≥ `SUBSTANTIAL_DIFF_LINES`) → fan out into parallel dimension agents:
      (a) **bugs/correctness** on the diff, (b) **rules-compliance** (this file + stack pack +
      `REVIEW.md`), (c) **git-history/blame** to classify introduced vs pre-existing.
-3. **Merge → refutation gate (try to refute each; keep only survivors ≥ threshold) → dedupe.**
-4. **Report** inline comments + one summary, and emit the evaluation log (see Output).
+3. **Collect candidates → independent judge (batched, unbiased) → keep survivors ≥ threshold → dedupe.**
+4. **Report** inline comments + one structured verdict, and emit the evaluation log (see Output).
 
 The fan-out only improves recall on large PRs. The confidence gate and verification pass are
 what control noise on *every* PR.
@@ -113,11 +117,32 @@ of style feedback.
   severity marker and confidence (e.g. `🔴 [conf 92]`). Include a brief why and, when small and
   self-contained, a suggested fix. Use the inline-comment tool **only** for actual findings —
   never for the summary.
-- **Summary:** always post exactly one **top-level PR comment** (via `gh pr comment`), never as
-  an inline comment on a line. Open with a one-line tally, e.g. `1 important, 2 nits`. Lead with
-  **"No blocking issues"** when there are none. Optionally note how many low-confidence or nit
-  findings were suppressed, as a count. When there are zero findings, this top-level comment is
-  the entire output — do not attach it to a file/line.
+- **Summary — one structured verdict:** always post exactly one **top-level PR comment** (via
+  `gh pr comment`), never inline. Use this **exact** structure every time, and **omit any optional
+  section that would be empty** (no empty headers → no noise):
+
+  ```
+  ## 🤖 AI review
+
+  **Merge confidence:** <🟢 High | 🟡 Medium | 🔴 Low> — <one-line rationale>
+
+  **Findings:** <X important, Y nits>[ · N dropped (see run Summary)]
+
+  **Open questions:**            ← include ONLY if there are any
+  - <a genuine, correctness-relevant ambiguity you could not resolve from the code>
+
+  **Notes:**                     ← include ONLY if there are any
+  - <non-blocking context worth knowing>
+  ```
+
+  **Merge-confidence rubric** (advisory — the reviewer's confidence, NOT a GitHub approval/block):
+  - 🟢 **High** — no 🔴 Important findings **and** no open questions; the change looks correct and
+    self-contained.
+  - 🟡 **Medium** — no 🔴, but 🟡 nits and/or open questions worth a human glance.
+  - 🔴 **Low** — one or more 🔴 Important findings; address before merge.
+
+  **Open questions** are capped at 3 and must be real correctness-relevant ambiguities (not style,
+  not "consider adding a test"). If there are none, omit the section — never pad it.
 - **Evaluation log (REQUIRED; workflow-only observability, NOT a PR comment):** as the final
   action, always use the `Write` tool to write a file named `.ai-review-log.md` in the repository
   root (the current working directory). Include **every candidate — kept AND dropped** — as a
@@ -126,6 +151,6 @@ of style feedback.
   | file:line | severity | conf | verdict | reason |
   |---|---|---|---|---|
 
-  `verdict` is `posted` or `dropped`; for dropped ones, `reason` states why the refutation gate or
-  a threshold rejected it. Write it even when there are zero candidates ("No candidates."). This is
+  `verdict` is `posted` or `dropped`; for dropped ones, `reason` states why the judge or a
+  threshold rejected it. Write it even when there are zero candidates ("No candidates."). This is
   how a human reads what the reviewer suppressed and why — it never appears on the PR.
