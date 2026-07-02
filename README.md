@@ -25,7 +25,6 @@ The reviewer scales scrutiny to PR size (trivial PRs get a single quick pass; su
 - [docs/architecture.md](docs/architecture.md) — the full pipeline, the independent judge, output, distribution.
 - [docs/configuration.md](docs/configuration.md) — inputs, secret, permissions, triggers, pinning, monorepo, and verifying the judge.
 - [docs/authoring-rule-packs.md](docs/authoring-rule-packs.md) — how the rules layer works and how to add/tune a stack pack.
-- [evals/README.md](evals/README.md) — the reference-free audit for measuring noise before shipping rule changes.
 
 ## Visibility
 

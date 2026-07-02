@@ -27,7 +27,7 @@ Holds the parts that are the same for every stack:
 - **Output** — inline comment shape and the structured verdict template.
 
 Tune `general.md` when the change is cross-stack (e.g. raise the threshold, cap nits differently,
-adjust the verdict). Validate with the [reference-free audit](../evals/README.md) before shipping.
+adjust the verdict). Validate on a real test PR before shipping (see [Validating rule changes](#validating-rule-changes)).
 
 ## A stack pack (`ios.md`, `android.md`, `backend.md`, `frontend.md`)
 
@@ -95,6 +95,13 @@ headers → no noise):
 
 ## Validating rule changes
 
-Use the reference-free audit before shipping a rules change — it runs the real packs over real PR
-diffs and scores the findings for noise, no hand-written labels. See
-[`evals/README.md`](../evals/README.md).
+Validate on a **real test PR** before rolling `v1`:
+
+1. On a throwaway branch of a target repo, add a caller pinned to an engine **commit SHA** (not
+   `@v1`) with the relevant `stack`.
+2. Open a PR that contains a couple of genuine issues **and** a noise trap — something the stack's
+   linter/toolchain owns, which the reviewer must NOT flag.
+3. Confirm the reviewer catches the real issues, stays silent on the trap, and renders the verdict
+   correctly. Set `debug: true` to inspect the judge and the full turn output; read the eval log on
+   the run Summary to see what was dropped and why.
+4. Once it behaves, roll `v1` forward to the new SHA.
