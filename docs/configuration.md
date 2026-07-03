@@ -13,7 +13,8 @@ only `if:` / `uses:` / `with:` / `secrets:` — all real work lives in the engin
 
 | Input | Required | Default | Purpose |
 |---|---|---|---|
-| `stack` | yes | — | Rule pack(s) to load. One (`ios`) or comma-separated for a monorepo (`backend,frontend`). The reviewer loads every listed pack and applies each to its own paths. |
+| `stack` | no | `none` | Central rule pack(s) to load. One (`ios`) or comma-separated for a monorepo (`backend,frontend`). The reviewer loads every listed pack and applies each to its own paths. `none` loads no central pack (rely on `custom_rules` and/or `general.md`). |
+| `custom_rules` | no | `""` | Comma-separated paths to rule files **in the consumer repo** (e.g. `.ai-review/frontend.md,.ai-review/api.md`). Read at run time and applied as stack packs, **above** the central pack. For repos that own their own rules. See [Repo-supplied rules](#repo-supplied-rules-custom_rules). |
 | `model` | no | `claude-sonnet-4-6` | Model ID passed to `claude-code-action`. Verify current IDs periodically. |
 | `rules_ref` | no | `v1` | Git ref of the engine repo to load `rules/*.md` from. Pin to a tag; moves with `@v1`. |
 | `max_turns` | no | `60` | Max agent turns. Raise for large or multi-stack PRs (e.g. `90`) if a run ever hits the cap. |
@@ -70,11 +71,37 @@ Pass `stack: backend,frontend`. Both packs load; each applies to its own paths (
 `apps/be`, frontend rules to `apps/fe`/`admin`/`ui`). Bump `max_turns` if a large multi-stack PR
 hits the cap.
 
+## Repo-supplied rules: `custom_rules`
+
+A consumer can supply its **own** rule files instead of (or on top of) a central stack pack — useful
+for repos **not created from a stack template**, or with a stack that has no central pack yet. The
+developer writes rule file(s) in their repo and passes their paths:
+
+```yaml
+with:
+  stack: none                                          # skip central packs
+  custom_rules: .ai-review/frontend.md,.ai-review/api.md
+```
+
+- Paths are **relative to the consumer repo root** and read at run time from the checked-out PR head
+  (the same place `REVIEW.md` is read). A path that doesn't exist is skipped and noted in the eval log.
+- Each file is applied as a **stack pack**, ranking **above** the central pack. `general.md` always
+  loads underneath.
+- Combine with a central pack to layer: `stack: frontend` + `custom_rules: .ai-review/overrides.md`.
+- Write these files in the shape described in
+  [authoring rule packs](authoring-rule-packs.md#a-stack-pack-iosmd-androidmd-backendmd-frontendmd).
+- **Trust note:** because they're read from the PR head, a PR can edit its own review rules. Fine for
+  internal repos; if that matters, keep the rules on a protected branch and review changes to them.
+
+See [`examples/caller-custom-rules.yml`](../examples/caller-custom-rules.yml).
+
 ## Per-repo overrides: `REVIEW.md`
 
 If a consumer repo has a `REVIEW.md` at its root, the reviewer reads it as the **highest-priority**
-overrides (above the stack pack and `general.md`). Use it to add repo-specific must-checks, tighten
-or relax severity, or extend skip globs for that repo only.
+overrides (above `custom_rules`, the stack pack, and `general.md`). Use it to add repo-specific
+must-checks, tighten or relax severity, or extend skip globs for that repo only.
+
+Full precedence: **`REVIEW.md` > `custom_rules` files > central stack pack > `general.md`**.
 
 ## Verifying the independent judge
 

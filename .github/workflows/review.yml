@@ -8,9 +8,15 @@ on:
   workflow_call:
     inputs:
       stack:
-        description: "Stack rule pack(s) to load, comma-separated (e.g. 'ios' or 'backend,frontend')."
-        required: true
+        description: "Central stack rule pack(s) to load, comma-separated (e.g. 'ios' or 'backend,frontend'). Use 'none' to load no central pack (rely on custom_rules and/or general.md)."
+        required: false
         type: string
+        default: "none"
+      custom_rules:
+        description: "Comma-separated paths to rule files IN THE CONSUMER REPO (e.g. '.ai-review/frontend.md,.ai-review/api.md'). Read at run time and applied as stack packs, ABOVE the central pack. For non-template repos that own their own rules."
+        required: false
+        type: string
+        default: ""
       model:
         description: "Model ID passed to claude-code-action. Verify current IDs periodically."
         required: false
@@ -103,15 +109,25 @@ jobs:
             PR number: ${{ steps.pr.outputs.number }}
             Repository: ${{ github.repository }}
             Requested stack pack(s): ${{ inputs.stack }}
+            Custom rule files: ${{ inputs.custom_rules }}
 
-            STEP 1 — Load the rules (highest priority, in this order):
+            STEP 1 — Load the rules (read every file that applies; precedence is defined at the end):
             - Read `.ai-review/rules/general.md` (the cross-stack core; it defines severity tiers,
-              the confidence threshold, the skip rules, and the pipeline you must follow).
-            - For EACH stack in the comma-separated list "${{ inputs.stack }}", read
-              `.ai-review/rules/<stack>.md` if it exists (e.g. `.ai-review/rules/ios.md`).
+              the confidence threshold, the skip rules, and the pipeline you must follow). ALWAYS
+              load this.
+            - Central stack packs: unless the requested stack is the literal value "none", then for
+              EACH stack in the comma-separated list "${{ inputs.stack }}" read
+              `.ai-review/rules/<stack>.md` if it exists (e.g. `.ai-review/rules/ios.md`). If it is
+              "none", load no central stack pack.
+            - Custom rule files: if "${{ inputs.custom_rules }}" is non-empty, then for EACH
+              comma-separated path in it, read that file FROM THE REPOSITORY ROOT (the consumer's own
+              repo — your current working directory, NOT `.ai-review/`) and treat it as a stack pack.
+              Skip any path that does not exist and note the skip in the evaluation log. These are the
+              consumer's own rules and rank ABOVE the central stack pack.
             - If a `REVIEW.md` exists at the repository root, read it and treat it as the
               HIGHEST-priority overrides for this repo.
-            Follow these files exactly. If they conflict, REVIEW.md > stack pack > general.md.
+            Follow these files exactly. If they conflict:
+            REVIEW.md > custom_rules files > central stack pack > general.md.
 
             STEP 2 — Get the change:
             - `gh pr view ${{ steps.pr.outputs.number }}` for title/description/state.

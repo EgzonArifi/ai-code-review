@@ -1,0 +1,43 @@
+# Custom-rules caller: copy into a repo at `.github/workflows/ai-review.yml`.
+#
+# For repos that were NOT created from a stack template and want to own their
+# review rules. The developer writes rule file(s) IN THIS REPO and passes their
+# paths via `custom_rules`; the engine reads them at run time and applies them as
+# stack packs — no central pack required.
+#
+# `stack: none`   → load no central pack (rely on your custom rules + general.md).
+# `custom_rules:` → comma-separated paths, relative to this repo's root.
+#
+# Precedence: REVIEW.md > custom_rules files > central stack pack > general.md.
+# `general.md` (correctness + noise control) always loads underneath.
+#
+# You can also COMBINE this with a central pack — e.g. `stack: frontend` plus
+# `custom_rules: .ai-review/overrides.md` layers your file above the central one.
+#
+# Requires an `ANTHROPIC_API_KEY` Actions secret.
+
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, ready_for_review]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  ai-review:
+    if: |
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request != null &&
+       contains(github.event.comment.body, '@ai-review'))
+    uses: EgzonArifi/ai-code-review/.github/workflows/review.yml@v1
+    with:
+      stack: none
+      custom_rules: .ai-review/frontend.md,.ai-review/api.md
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

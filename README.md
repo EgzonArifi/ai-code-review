@@ -16,7 +16,7 @@ Anthropic ships a hosted [Code Review](https://code.claude.com/docs/en/code-revi
 - `rules/` — the durable, tunable asset:
   - `general.md` — cross-stack philosophy + noise control (severity tiers, a 0–100 confidence gate, an **independent judge**, skip logic, the structured verdict).
   - `ios.md`, `android.md` (Kotlin + Compose), `backend.md` (NestJS + Prisma), `frontend.md` (React + Vite + TanStack) — per-stack packs, added one at a time; `react-native.md` next.
-- `examples/caller.yml` (single stack) and `examples/caller-monorepo.yml` (`stack: backend,frontend`) — copy-paste snippets consumers add to opt in.
+- `examples/caller.yml` (single stack), `examples/caller-monorepo.yml` (`stack: backend,frontend`), and `examples/caller-custom-rules.yml` (repo-supplied rules) — copy-paste snippets consumers add to opt in.
 
 The reviewer scales scrutiny to PR size (trivial PRs get a single quick pass; substantial ones fan out into dimension sub-agents). Findings are then handed to a **separate, independent judge sub-agent** — it never sees the finder's reasoning — which assigns each a 0–100 confidence; only judge-confirmed findings post. Output is inline comments plus one **structured verdict** (merge confidence, must-fix blockers, findings tally, risk areas, open questions) and a workflow-only **evaluation log** of everything considered, kept and dropped.
 
@@ -33,6 +33,18 @@ This repo is intentionally **public**. Consumers span multiple GitHub orgs, and 
 ## Consuming it
 
 Add a caller workflow (see [`examples/caller.yml`](examples/caller.yml)) to your repo and set an `ANTHROPIC_API_KEY` secret — the only required secret. For a monorepo, pass multiple stacks (`stack: backend,frontend`). Pin to `@v1` (rolling, auto-updates) or an immutable SHA for a stricter supply-chain posture. Full details — inputs, permissions, triggers, pinning — in [docs/configuration.md](docs/configuration.md).
+
+### Repos with their own rules (custom_rules)
+
+A repo doesn't need a central stack pack — it can supply its **own** rule files. This suits projects **not created from a stack template**, or ones with idiosyncratic rules. The developer writes rule file(s) in their repo and points the caller at them:
+
+```yaml
+with:
+  stack: none                                          # skip central packs…
+  custom_rules: .ai-review/frontend.md,.ai-review/api.md   # …use the repo's own rules
+```
+
+The engine reads those paths from the consumer repo at run time and applies them as stack packs. `general.md` (correctness + noise control) always loads underneath, and you can still layer on top of a central pack (e.g. `stack: frontend` + `custom_rules: .ai-review/overrides.md`). Precedence: **`REVIEW.md` > `custom_rules` files > central stack pack > `general.md`**. See [`examples/caller-custom-rules.yml`](examples/caller-custom-rules.yml). For a one-file per-repo tweak with no caller change, `REVIEW.md` at the repo root still works (highest priority).
 
 ## Status
 
