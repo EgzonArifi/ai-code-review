@@ -7,10 +7,12 @@ The rules are the product. This is how they're structured and how to add or tune
 Every review loads, in increasing priority:
 
 1. **`rules/general.md`** — cross-stack philosophy + noise control. Always loaded.
-2. **`rules/<stack>.md`** — the stack pack(s) named in the `stack` input.
-3. **`REVIEW.md`** at the consumer repo root, if present — per-repo overrides.
+2. **`rules/<stack>.md`** — the central stack pack(s) named in the `stack` input.
+3. **`custom_rules` files** — rule files supplied by the consumer repo via the `custom_rules` input
+   (see [configuration](configuration.md#repo-supplied-rules-custom_rules)), applied as stack packs.
+4. **`REVIEW.md`** at the consumer repo root, if present — per-repo overrides.
 
-When they conflict: **`REVIEW.md` > stack pack > `general.md`**.
+When they conflict: **`REVIEW.md` > `custom_rules` files > central stack pack > `general.md`**.
 
 ## `general.md` — the noise-control core
 
